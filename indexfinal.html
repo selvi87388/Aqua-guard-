@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AquaGuard — Smart Water Leakage Detection System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-red {
+      0%, 100% { background-color: #dc2626; }
+      50% { background-color: #991b1b; }
+    }
+    .animate-leak {
+      animation: pulse-red 1.2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center text-xl font-bold shadow">
+          💧
+        </div>
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 leading-tight">AquaGuard</h1>
+          <p class="text-xs text-slate-500">Smart Plumbing Leak Detection & Conservation System (CIV104)</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="serialBtn" onclick="connectSerial()" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition">
+          🔌 Connect ESP/Arduino USB
+        </button>
+        <button id="muteBtn" onclick="toggleMute()" class="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 transition">
+          🔊 Alarm Sound: ON
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+    <!-- Dynamic Status Banner -->
+    <div id="statusBanner" class="rounded-2xl p-5 text-white bg-emerald-600 shadow-md transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span id="statusIcon" class="text-3xl">✅</span>
+        <div>
+          <h2 id="statusTitle" class="text-xl font-bold tracking-wide">SYSTEM NORMAL — ALL PIPES DRY</h2>
+          <p id="statusSubtitle" class="text-sm text-emerald-100">Continuous monitoring active across 4 plumbing zones & concealed joints.</p>
+        </div>
+      </div>
+      <button id="ackBtn" onclick="resetAllZones()" class="hidden px-4 py-2 bg-white text-red-700 font-bold text-sm rounded-xl shadow hover:bg-red-50 transition shrink-0">
+        🛑 Shut Off Main Valve & Reset
+      </button>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <p class="text-xs font-semibold text-slate-500 uppercase">System Status</p>
+        <p id="kpiHealth" class="text-2xl font-bold text-emerald-600 mt-1">100% Optimal</p>
+        <p class="text-xs text-slate-400 mt-1">4 / 4 Sensors Online</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <p class="text-xs font-semibold text-slate-500 uppercase">Live Water Loss</p>
+        <p id="kpiWasted" class="text-2xl font-bold text-slate-800 mt-1">0.00 L</p>
+        <p id="kpiCost" class="text-xs text-slate-400 mt-1">Est. Loss: ₹0.00</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <p class="text-xs font-semibold text-slate-500 uppercase">Water Saved Today</p>
+        <p id="kpiSaved" class="text-2xl font-bold text-blue-600 mt-1">1,450 L</p>
+        <p class="text-xs text-slate-400 mt-1">Early leak prevention</p>
+      </div>
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <p class="text-xs font-semibold text-slate-500 uppercase">UN SDG Alignment</p>
+        <p class="text-xl font-bold text-teal-700 mt-1">SDG 6 & SDG 11</p>
+        <p class="text-xs text-slate-400 mt-1">Clean Water & Sustainable Cities</p>
+      </div>
+    </div>
+
+    <!-- 4 Plumbing Sensor Zones -->
+    <div>
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-bold text-slate-800">Monitored Plumbing Zones</h3>
+        <span class="text-xs text-slate-500">Click "Test Leak" on any zone to simulate</span>
+      </div>
+      <div id="zonesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+    </div>
+
+    <!-- Presentation Demo Control Bar -->
+    <div class="bg-slate-900 text-white rounded-2xl p-5 shadow-lg">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-blue-400">Presentation Simulator</span>
+          <h3 class="text-base font-bold mt-0.5">Live Demo Controls (No Hardware Needed)</h3>
+          <p class="text-xs text-slate-400 mt-0.5">Trigger simulated pipe failures during your presentation to demonstrate instant detection and valve shutoff.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="triggerLeak(2, 48, 1.8)" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs transition">
+            💧 Simulate Minor Drip (Zone 2)
+          </button>
+          <button onclick="triggerLeak(1, 94, 6.5)" class="px-3.5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs transition">
+            🚨 Simulate Pipe Burst (Zone 1)
+          </button>
+          <button onclick="resetAllZones()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition">
+            ✅ Reset All Dry
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Incident History Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h3 class="text-base font-bold text-slate-800">Leak Incident & Valve Action Log</h3>
+          <p class="text-xs text-slate-500">Automated audit trail for plumbing maintenance</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="exportCSV()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+            📥 Export CSV
+          </button>
+          <button onclick="clearLogs()" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition">
+            🗑️ Clear Log
+          </button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
+              <th class="py-3 px-4">Timestamp</th>
+              <th class="py-3 px-4">Plumbing Zone</th>
+              <th class="py-3 px-4">Moisture</th>
+              <th class="py-3 px-4">Flow Rate</th>
+              <th class="py-3 px-4">Automated Action</th>
+              <th class="py-3 px-4">Status</th>
+            </tr>
+          </thead>
+          <tbody id="logTableBody" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 py-4 border-t border-slate-200 bg-white">
+    AquaGuard Smart Water Conservation Prototype • Environmental Science & Sustainability (CIV104)
+  </footer>
+
+  <script>
+    // --- State Management ---
+    const defaultZones = [
+      { id: 1, name: "Zone 1: Main Supply Inlet Valve", pipe: "UPVC 1-inch Joint", moisture: 4, flow: 0.0, leaking: false },
+      { id: 2, name: "Zone 2: Overhead Tank Outlet", pipe: "CPVC 90° Elbow Fitting", moisture: 6, flow: 0.0, leaking: false },
+      { id: 3, name: "Zone 3: Concealed Bathroom Line", pipe: "CPVC T-Joint", moisture: 5, flow: 0.0, leaking: false },
+      { id: 4, name: "Zone 4: Kitchen Sink Trap & Drain", pipe: "PVC Flexible Coupling", moisture: 7, flow: 0.0, leaking: false }
+    ];
+
+    let zones = JSON.parse(JSON.stringify(defaultZones));
+    let wastedLiters = 0;
+    let savedLiters = 1450;
+    let isMuted = false;
+    let audioCtx = null;
+
+    const defaultLogs = [
+      { time: "15-11-2026 09:14:22", zone: "Zone 2: Overhead Tank Outlet", moisture: "62%", flow: "2.1 L/min", action: "Buzzer Alert + Solenoid Closed", status: "Resolved" },
+      { time: "14-11-2026 18:40:05", zone: "Zone 4: Kitchen Sink Trap & Drain", moisture: "48%", flow: "1.4 L/min", action: "User Notification Sent", status: "Resolved" }
+    ];
+
+    let logs = JSON.parse(localStorage.getItem("aquaguard_logs")) || defaultLogs;
+
+    // --- Web Audio API Beep Generator ---
+    function playBeep() {
+      if (isMuted) return;
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.18);
+      } catch (e) {}
+    }
+
+    function toggleMute() {
+      isMuted = !isMuted;
+      document.getElementById("muteBtn").innerText = isMuted ? "🔇 Alarm Sound: OFF" : "🔊 Alarm Sound: ON";
+    }
+
+    // --- Render Functions ---
+    function renderZones() {
+      const grid = document.getElementById("zonesGrid");
+      grid.innerHTML = zones.map(z => {
+        const borderClass = z.leaking ? "border-red-400 ring-2 ring-red-200 bg-red-50/30" : "border-slate-200 bg-white";
+        const badgeClass = z.leaking ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700";
+        const barColor = z.leaking ? "bg-red-600" : "bg-emerald-500";
+        return `
+          <div class="p-4 rounded-2xl border ${borderClass} shadow-sm transition-all">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <h4 class="font-bold text-slate-900 text-sm">${z.name}</h4>
+                <p class="text-xs text-slate-500">${z.pipe}</p>
+              </div>
+              <span class="px-2.5 py-1 rounded-full text-xs font-bold ${badgeClass}">
+                ${z.leaking ? "⚠️ LEAK DETECTED" : "✅ DRY"}
+              </span>
+            </div>
+
+            <div class="mt-4">
+              <div class="flex justify-between text-xs font-semibold mb-1">
+                <span class="text-slate-600">Surface Moisture</span>
+                <span class="${z.leaking ? 'text-red-600' : 'text-slate-800'}">${z.moisture}%</span>
+              </div>
+              <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                <div class="${barColor} h-2.5 rounded-full transition-all duration-300" style="width: ${z.moisture}%"></div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span class="text-slate-500">Abnormal Flow: <strong class="text-slate-800">${z.flow.toFixed(1)} L/min</strong></span>
+              <div class="flex gap-1.5">
+                ${z.leaking
+                  ? `<button onclick="resetZone(${z.id})" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-semibold hover:bg-emerald-700">Fix / Dry</button>`
+                  : `<button onclick="triggerLeak(${z.id}, 88, 4.5)" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 font-semibold hover:bg-red-100 hover:text-red-700">Test Leak</button>`
+                }
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function updateBanner() {
+      const activeLeaks = zones.filter(z => z.leaking);
+      const banner = document.getElementById("statusBanner");
+      const icon = document.getElementById("statusIcon");
+      const title = document.getElementById("statusTitle");
+      const sub = document.getElementById("statusSubtitle");
+      const ackBtn = document.getElementById("ackBtn");
+      const kpiHealth = document.getElementById("kpiHealth");
+
+      if (activeLeaks.length > 0) {
+        banner.className = "rounded-2xl p-5 text-white animate-leak shadow-lg transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4";
+        icon.innerText = "🚨";
+        title.innerText = `CRITICAL LEAK DETECTED (${activeLeaks.length} ZONE${activeLeaks.length > 1 ? 'S' : ''})`;
+        sub.innerText = `Water detected at ${activeLeaks.map(z => z.name).join(", ")}. Solenoid shutoff recommended!`;
+        sub.className = "text-sm text-red-100";
+        ackBtn.classList.remove("hidden");
+        kpiHealth.innerText = "ALERT ACTIVE";
+        kpiHealth.className = "text-2xl font-bold text-red-600 mt-1";
+      } else {
+        banner.className = "rounded-2xl p-5 text-white bg-emerald-600 shadow-md transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4";
+        icon.innerText = "✅";
+        title.innerText = "SYSTEM NORMAL — ALL PIPES DRY";
+        sub.innerText = "Continuous monitoring active across 4 plumbing zones & concealed joints.";
+        sub.className = "text-sm text-emerald-100";
+        ackBtn.classList.add("hidden");
+        kpiHealth.innerText = "100% Optimal";
+        kpiHealth.className = "text-2xl font-bold text-emerald-600 mt-1";
+      }
+    }
+
+    function renderLogs() {
+      const tbody = document.getElementById("logTableBody");
+      if (logs.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-400 text-xs">No leak incidents recorded.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = logs.map(l => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-3 px-4 text-xs text-slate-600 font-mono">${l.time}</td>
+          <td class="py-3 px-4 font-semibold text-slate-800 text-xs">${l.zone}</td>
+          <td class="py-3 px-4 text-xs font-bold text-red-600">${l.moisture}</td>
+          <td class="py-3 px-4 text-xs text-slate-600">${l.flow}</td>
+          <td class="py-3 px-4 text-xs text-slate-600">${l.action}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-0.5 rounded-full text-xs font-bold ${l.status === 'Active' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">
+              ${l.status}
+            </span>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    // --- Actions ---
+    function triggerLeak(zoneId, moistureVal, flowVal) {
+      const z = zones.find(item => item.id === zoneId);
+      if (!z) return;
+      z.leaking = true;
+      z.moisture = moistureVal;
+      z.flow = flowVal;
+
+      const now = new Date().toLocaleString("en-IN", { hour12: false });
+      logs.unshift({
+        time: now,
+        zone: z.name,
+        moisture: moistureVal + "%",
+        flow: flowVal.toFixed(1) + " L/min",
+        action: "Audio Alarm + Alert Triggered",
+        status: "Active"
+      });
+      localStorage.setItem("aquaguard_logs", JSON.stringify(logs));
+
+      playBeep();
+      renderZones();
+      updateBanner();
+      renderLogs();
+    }
+
+    function resetZone(zoneId) {
+      const z = zones.find(item => item.id === zoneId);
+      if (!z) return;
+      z.leaking = false;
+      z.moisture = 5;
+      z.flow = 0.0;
+      logs.forEach(l => { if (l.zone === z.name && l.status === "Active") l.status = "Resolved"; });
+      localStorage.setItem("aquaguard_logs", JSON.stringify(logs));
+      savedLiters += 15;
+      document.getElementById("kpiSaved").innerText = savedLiters.toLocaleString() + " L";
+      renderZones();
+      updateBanner();
+      renderLogs();
+    }
+
+    function resetAllZones() {
+      zones = JSON.parse(JSON.stringify(defaultZones));
+      logs.forEach(l => { if (l.status === "Active") l.status = "Resolved"; });
+      localStorage.setItem("aquaguard_logs", JSON.stringify(logs));
+      savedLiters += 25;
+      document.getElementById("kpiSaved").innerText = savedLiters.toLocaleString() + " L";
+      renderZones();
+      updateBanner();
+      renderLogs();
+    }
+
+    function clearLogs() {
+      logs = [];
+      localStorage.setItem("aquaguard_logs", JSON.stringify(logs));
+      renderLogs();
+    }
+
+    function exportCSV() {
+      const headers = ["Timestamp,Plumbing Zone,Moisture,Flow Rate,Automated Action,Status"];
+      const rows = logs.map(l => `"${l.time}","${l.zone}","${l.moisture}","${l.flow}","${l.action}","${l.status}"`);
+      const blob = new Blob([headers.concat(rows).join("\n")], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "AquaGuard_Leak_Report.csv";
+      a.click();
+    }
+
+    // --- Real-Time Ticker (Water Loss + Alarm Loop) ---
+    setInterval(() => {
+      const activeLeaks = zones.filter(z => z.leaking);
+      if (activeLeaks.length > 0) {
+        const totalFlowPerSec = activeLeaks.reduce((sum, z) => sum + (z.flow / 60), 0);
+        wastedLiters += totalFlowPerSec;
+        document.getElementById("kpiWasted").innerText = wastedLiters.toFixed(2) + " L";
+        document.getElementById("kpiCost").innerText = "Est. Loss: ₹" + (wastedLiters * 0.12).toFixed(2);
+        playBeep();
+      }
+    }, 1000);
+
+    // --- Optional USB Hardware Integration (Web Serial API for ESP8266/Arduino) ---
+    async function connectSerial() {
+      if (!("serial" in navigator)) {
+        alert("Web Serial is supported in Chrome/Edge desktop browsers.");
+        return;
+      }
+      try {
+        const port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+        document.getElementById("serialBtn").innerText = "🟢 Hardware Connected";
+        const decoder = new TextDecoderStream();
+        port.readable.pipeTo(decoder.writable);
+        const reader = decoder.readable.getReader();
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          if (value && value.includes("LEAK")) {
+            triggerLeak(1, 92, 5.0);
+          }
+        }
+      } catch (err) {
+        console.log("Serial connection cancelled:", err);
+      }
+    }
+
+    // Initial Render
+    renderZones();
+    updateBanner();
+    renderLogs();
+  </script>
+</body>
+</html>
